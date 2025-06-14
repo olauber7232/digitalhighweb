@@ -12,6 +12,7 @@ import About from "@/pages/about";
 import Contact from "@/pages/contact";
 import FAQ from "@/pages/faq";
 import Proposal from "@/pages/proposal";
+import Pricing from "@/pages/pricing";
 import NotFound from "@/pages/not-found";
 
 // Admin Pages
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/contact" component={Contact} />
       <Route path="/faq" component={FAQ} />
       <Route path="/proposal" component={Proposal} />
+      <Route path="/pricing" component={Pricing} />
       
       {/* Admin Routes */}
       <Route path="/admin/login" component={AdminLogin} />
