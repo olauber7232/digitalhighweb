@@ -29,25 +29,44 @@ export default function BlogEditor() {
     readTime: "5 min read"
   });
 
-  useEffect(() => {
-    if (isEditing && blogId) {
-      const existingPost = getBlogPost(blogId);
-      if (existingPost) {
-        setFormData({
-          title: existingPost.title,
-          excerpt: existingPost.excerpt,
-          content: existingPost.content,
-          category: existingPost.category,
-          author: existingPost.author,
-          status: existingPost.status,
-          image: existingPost.image,
-          readTime: existingPost.readTime
-        });
-      }
-    }
-  }, [isEditing, blogId]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const loadBlogPost = async () => {
+      if (isEditing && blogId) {
+        setLoading(true);
+        try {
+          const existingPost = await getBlogPost(blogId);
+          if (existingPost) {
+            setFormData({
+              title: existingPost.title,
+              excerpt: existingPost.excerpt,
+              content: existingPost.content,
+              category: existingPost.category,
+              author: existingPost.author,
+              status: existingPost.status,
+              image: existingPost.image,
+              readTime: existingPost.readTime
+            });
+          }
+        } catch (error) {
+          console.error('Error loading blog post:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load blog post.",
+            variant: "destructive",
+          });
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadBlogPost();
+  }, [isEditing, blogId, toast]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.title || !formData.excerpt || !formData.content || !formData.category) {
@@ -59,6 +78,8 @@ export default function BlogEditor() {
       return;
     }
 
+    setSaving(true);
+
     const blogData = {
       ...formData,
       date: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
@@ -66,7 +87,7 @@ export default function BlogEditor() {
 
     try {
       if (isEditing && blogId) {
-        const updatedPost = updateBlogPost(blogId, blogData);
+        const updatedPost = await updateBlogPost(blogId, blogData);
         if (updatedPost) {
           toast({
             title: "Blog Updated",
@@ -76,7 +97,7 @@ export default function BlogEditor() {
           throw new Error("Failed to update blog post");
         }
       } else {
-        createBlogPost(blogData);
+        await createBlogPost(blogData);
         toast({
           title: "Blog Created",
           description: "Blog post has been created successfully.",
@@ -85,11 +106,14 @@ export default function BlogEditor() {
       
       setLocation("/admin/blogs");
     } catch (error) {
+      console.error('Error saving blog post:', error);
       toast({
         title: "Error",
         description: "Failed to save blog post. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -107,6 +131,16 @@ export default function BlogEditor() {
       });
     }
   };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -132,9 +166,9 @@ export default function BlogEditor() {
               <Eye className="w-4 h-4 mr-2" />
               Preview
             </Button>
-            <Button form="blog-form" type="submit">
+            <Button form="blog-form" type="submit" disabled={saving}>
               <Save className="w-4 h-4 mr-2" />
-              {isEditing ? "Update" : "Save"}
+              {saving ? "Saving..." : (isEditing ? "Update" : "Save")}
             </Button>
           </div>
         </div>

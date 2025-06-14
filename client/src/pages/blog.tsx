@@ -7,20 +7,53 @@ import { Button } from "@/components/ui/button";
 import { Calendar, User, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { useState } from "react";
-import { getBlogPosts } from "@/data/blog-data";
+import { useState, useEffect } from "react";
+import { getBlogPosts, type BlogPost } from "@/data/blog-data";
 
 export default function Blog() {
   const [visiblePosts, setVisiblePosts] = useState(6);
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  const blogPosts = getBlogPosts(); // Get published posts only
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const posts = await getBlogPosts();
+        setBlogPosts(posts);
+      } catch (error) {
+        console.error('Error loading blog posts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchPosts();
+  }, []);
   
   const categories = ["All", ...Array.from(new Set(blogPosts.map(post => post.category)))];
 
   const filteredPosts = blogPosts.filter(post => 
     selectedCategory === "All" || post.category === selectedCategory
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <Navigation />
+        <main className="pt-20">
+          <div className="container mx-auto px-6 py-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto"></div>
+              <p className="mt-4 text-muted-foreground">Loading blog posts...</p>
+            </div>
+          </div>
+        </main>
+        <Footer />
+        <ChatWidget />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">

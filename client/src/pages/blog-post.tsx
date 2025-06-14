@@ -1,4 +1,5 @@
 import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
 import Navigation from "@/components/navigation";
 import Footer from "@/components/footer";
 import ChatWidget from "@/components/chat-widget";
@@ -7,23 +8,66 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, User, ArrowLeft, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { getBlogPost } from "@/data/blog-data";
+import { getBlogPost, type BlogPost } from "@/data/blog-data";
 
 export default function BlogPost() {
   const [location] = useLocation();
   const postId = parseInt(location.split('/')[2]);
+  const [post, setPost] = useState<BlogPost | null>(null);
+  const [loading, setLoading] = useState(true);
   
-  const post = getBlogPost(postId);
+  useEffect(() => {
+    const fetchPost = async () => {
+      try {
+        const fetchedPost = await getBlogPost(postId);
+        setPost(fetchedPost || null);
+      } catch (error) {
+        console.error('Error loading blog post:', error);
+        setPost(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (postId) {
+      fetchPost();
+    }
+  }, [postId]);
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <Navigation />
+        <main className="pt-20">
+          <div className="container mx-auto px-6 py-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto"></div>
+              <p className="mt-4 text-muted-foreground">Loading blog post...</p>
+            </div>
+          </div>
+        </main>
+        <Footer />
+        <ChatWidget />
+      </div>
+    );
+  }
   
   if (!post) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">Post Not Found</h1>
-          <Link href="/blog">
-            <Button>Back to Blog</Button>
-          </Link>
-        </div>
+      <div className="min-h-screen">
+        <Navigation />
+        <main className="pt-20">
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <h1 className="text-4xl font-bold mb-4">Post Not Found</h1>
+              <Link href="/blog">
+                <Button>Back to Blog</Button>
+              </Link>
+            </div>
+          </div>
+        </main>
+        <Footer />
+        <ChatWidget />
       </div>
     );
   }

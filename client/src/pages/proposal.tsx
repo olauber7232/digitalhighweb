@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,15 +19,42 @@ export default function Proposal() {
     budget: "",
     requirements: ""
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Proposal Request Submitted!",
-      description: "We will send your custom proposal within 24 hours.",
-    });
-    setFormData({ name: "", email: "", businessType: "", budget: "", requirements: "" });
+    setIsSubmitting(true);
+    
+    try {
+      const response = await fetch('/api/proposals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to submit proposal');
+      }
+      
+      toast({
+        title: "Proposal Request Submitted!",
+        description: "We will send your custom proposal within 24 hours.",
+      });
+      
+      setFormData({ name: "", email: "", businessType: "", budget: "", requirements: "" });
+    } catch (error) {
+      console.error('Error submitting proposal:', error);
+      toast({
+        title: "Submission Failed",
+        description: "There was an error submitting your proposal. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -86,8 +112,6 @@ export default function Proposal() {
                         <span>{item}</span>
                       </motion.div>
                     ))}
-                    
-                    
                   </CardContent>
                 </Card>
               </motion.div>
@@ -172,9 +196,14 @@ export default function Proposal() {
                         />
                       </div>
 
-                      <Button type="submit" size="lg" className="w-full bg-gradient-to-r from-accent to-primary hover:from-accent/80 hover:to-primary/80">
+                      <Button 
+                        type="submit" 
+                        size="lg" 
+                        className="w-full bg-gradient-to-r from-accent to-primary hover:from-accent/80 hover:to-primary/80"
+                        disabled={isSubmitting}
+                      >
                         <Rocket className="w-5 h-5 mr-2" />
-                        Get My Free Proposal
+                        {isSubmitting ? "Submitting..." : "Get My Free Proposal"}
                       </Button>
                     </form>
                   </CardContent>

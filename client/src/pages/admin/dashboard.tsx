@@ -10,59 +10,86 @@ import {
   LogOut,
   Plus,
   Eye,
-  Edit,
-  Trash2
+  Edit
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import AdminLayout from "@/components/admin/admin-layout";
-import { getBlogStats, getAllBlogPosts } from "@/data/blog-data";
+import { getBlogStats, getAllBlogPosts, type BlogPost } from "@/data/blog-data";
+
+interface Proposal {
+  id: number;
+  name: string;
+  email: string;
+  businessType: string;
+  budget: string;
+  status: string;
+  date: string;
+}
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  // Get real blog stats
-  const blogStats = getBlogStats();
-  const recentBlogs = getAllBlogPosts().slice(0, 3);
-
-  // Mock data for proposals - in production, this would come from your backend
-  const [stats] = useState({
-    totalProposals: 24,
-    pendingProposals: 8,
-    totalViews: blogStats.totalViews
+  const [stats, setStats] = useState({
+    totalProposals: 0,
+    pendingProposals: 0,
+    totalViews: 0,
+    blogStats: {
+      total: 0,
+      published: 0,
+      draft: 0,
+      totalViews: 0
+    }
   });
 
-  const [recentProposals] = useState([
-    {
-      id: 1,
-      name: "John Smith",
-      email: "john@example.com",
-      businessType: "E-commerce",
-      budget: "$2,500 - $5,000",
-      status: "pending",
-      date: "2024-01-15"
-    },
-    {
-      id: 2,
-      name: "Sarah Johnson",
-      email: "sarah@company.com",
-      businessType: "Professional Services",
-      budget: "$1,000 - $2,500",
-      status: "reviewed",
-      date: "2024-01-14"
-    },
-    {
-      id: 3,
-      name: "Mike Chen",
-      email: "mike@startup.com",
-      businessType: "Technology",
-      budget: "$5,000+",
-      status: "pending",
-      date: "2024-01-13"
-    }
-  ]);
+  const [recentBlogs, setRecentBlogs] = useState<BlogPost[]>([]);
+  const [recentProposals, setRecentProposals] = useState<Proposal[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        // Load blog stats and recent blogs
+        const [blogStatsData, allBlogs] = await Promise.all([
+          getBlogStats(),
+          getAllBlogPosts()
+        ]);
+
+        setRecentBlogs(allBlogs.slice(0, 3));
+
+        // Load proposal stats and recent proposals
+        const [proposalStatsResponse, proposalsResponse] = await Promise.all([
+          fetch('/api/proposals/stats'),
+          fetch('/api/proposals')
+        ]);
+
+        const proposalStats = await proposalStatsResponse.json();
+        const proposals = await proposalsResponse.json();
+
+        setRecentProposals(proposals.slice(0, 3));
+
+        setStats({
+          totalProposals: proposalStats.total || 0,
+          pendingProposals: proposalStats.pending || 0,
+          totalViews: blogStatsData.totalViews,
+          blogStats: blogStatsData
+        });
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load dashboard data.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, [toast]);
 
   const handleLogout = () => {
     localStorage.removeItem("adminAuth");
@@ -73,6 +100,16 @@ export default function AdminDashboard() {
     });
     setLocation("/admin/login");
   };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -104,7 +141,7 @@ export default function AdminDashboard() {
               <CardContent>
                 <div className="text-2xl font-bold">{stats.totalProposals}</div>
                 <p className="text-xs text-muted-foreground">
-                  +12% from last month
+                  From website visitors
                 </p>
               </CardContent>
             </Card>
@@ -140,9 +177,9 @@ export default function AdminDashboard() {
                 <MessageSquare className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{blogStats.total}</div>
+                <div className="text-2xl font-bold">{stats.blogStats.total}</div>
                 <p className="text-xs text-muted-foreground">
-                  {blogStats.published} published, {blogStats.draft} drafts
+                  {stats.blogStats.published} published, {stats.blogStats.draft} drafts
                 </p>
               </CardContent>
             </Card>
@@ -188,19 +225,23 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recentProposals.map((proposal) => (
-                    <div key={proposal.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
-                      <div className="flex-1">
-                        <h4 className="font-medium">{proposal.name}</h4>
-                        <p className="text-sm text-muted-foreground">{proposal.businessType} • {proposal.budget}</p>
+                  {recentProposals.length > 0 ? (
+                    recentProposals.map((proposal) => (
+                      <div key={proposal.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{proposal.name}</h4>
+                          <p className="text-sm text-muted-foreground">{proposal.businessType} • {proposal.budget}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={proposal.status === "pending" ? "secondary" : "default"}>
+                            {proposal.status}
+                          </Badge>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={proposal.status === "pending" ? "secondary" : "default"}>
-                          {proposal.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground text-center py-4">No proposals yet</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -225,37 +266,41 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recentBlogs.map((blog) => (
-                    <div key={blog.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm line-clamp-1">{blog.title}</h4>
-                        <p className="text-xs text-muted-foreground">{blog.views || 0} views • {new Date(blog.date).toLocaleDateString()}</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={blog.status === "published" ? "default" : "secondary"}>
-                          {blog.status}
-                        </Badge>
-                        <div className="flex space-x-1">
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-8 w-8 p-0"
-                            onClick={() => window.open(`/blog/${blog.id}`, '_blank')}
-                          >
-                            <Eye className="w-3 h-3" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-8 w-8 p-0"
-                            onClick={() => setLocation(`/admin/blogs/edit/${blog.id}`)}
-                          >
-                            <Edit className="w-3 h-3" />
-                          </Button>
+                  {recentBlogs.length > 0 ? (
+                    recentBlogs.map((blog) => (
+                      <div key={blog.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-sm line-clamp-1">{blog.title}</h4>
+                          <p className="text-xs text-muted-foreground">{blog.views || 0} views • {new Date(blog.date).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={blog.status === "published" ? "default" : "secondary"}>
+                            {blog.status}
+                          </Badge>
+                          <div className="flex space-x-1">
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-8 w-8 p-0"
+                              onClick={() => window.open(`/blog/${blog.id}`, '_blank')}
+                            >
+                              <Eye className="w-3 h-3" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-8 w-8 p-0"
+                              onClick={() => setLocation(`/admin/blogs/edit/${blog.id}`)}
+                            >
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground text-center py-4">No blog posts yet</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

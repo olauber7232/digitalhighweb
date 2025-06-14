@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,6 @@ import {
   Eye, 
   Trash2, 
   Search, 
-  Filter,
   Download,
   Mail,
   Phone
@@ -16,57 +15,47 @@ import { motion } from "framer-motion";
 import AdminLayout from "@/components/admin/admin-layout";
 import { useToast } from "@/hooks/use-toast";
 
+interface Proposal {
+  id: number;
+  name: string;
+  email: string;
+  businessType: string;
+  budget: string;
+  requirements: string;
+  status: string;
+  date: string;
+  phone?: string;
+}
+
 export default function AdminProposals() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [proposals, setProposals] = useState([
-    {
-      id: 1,
-      name: "John Smith",
-      email: "john@example.com",
-      businessType: "E-commerce",
-      budget: "$2,500 - $5,000",
-      requirements: "Need a complete e-commerce website with payment integration, inventory management, and customer portal. Looking for modern design with mobile optimization.",
-      status: "pending",
-      date: "2024-01-15",
-      phone: "+1 (555) 123-4567"
-    },
-    {
-      id: 2,
-      name: "Sarah Johnson",
-      email: "sarah@company.com",
-      businessType: "Professional Services",
-      budget: "$1,000 - $2,500",
-      requirements: "Professional website for consulting firm. Need contact forms, service pages, team profiles, and blog functionality.",
-      status: "reviewed",
-      date: "2024-01-14",
-      phone: "+1 (555) 234-5678"
-    },
-    {
-      id: 3,
-      name: "Mike Chen",
-      email: "mike@startup.com",
-      businessType: "Technology",
-      budget: "$5,000+",
-      requirements: "SaaS landing page with user authentication, dashboard, and subscription management. Need modern UI/UX design.",
-      status: "pending",
-      date: "2024-01-13",
-      phone: "+1 (555) 345-6789"
-    },
-    {
-      id: 4,
-      name: "Lisa Rodriguez",
-      email: "lisa@restaurant.com",
-      businessType: "Restaurant",
-      budget: "$500 - $1,000",
-      requirements: "Restaurant website with online menu, reservation system, and location information. Need food photography integration.",
-      status: "completed",
-      date: "2024-01-12",
-      phone: "+1 (555) 456-7890"
+  // Load proposals from API
+  const loadProposals = async () => {
+    try {
+      const response = await fetch('/api/proposals');
+      if (!response.ok) throw new Error('Failed to fetch proposals');
+      const proposalData = await response.json();
+      setProposals(proposalData);
+    } catch (error) {
+      console.error('Error loading proposals:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load proposals.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    loadProposals();
+  }, []);
 
   const filteredProposals = proposals.filter(proposal => {
     const matchesSearch = proposal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -76,22 +65,52 @@ export default function AdminProposals() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleStatusChange = (id: number, newStatus: string) => {
-    setProposals(prev => prev.map(proposal => 
-      proposal.id === id ? { ...proposal, status: newStatus } : proposal
-    ));
-    toast({
-      title: "Status Updated",
-      description: `Proposal status changed to ${newStatus}`,
-    });
+  const handleStatusChange = async (id: number, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/proposals/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      
+      if (!response.ok) throw new Error('Failed to update proposal');
+      
+      await loadProposals(); // Reload proposals
+      toast({
+        title: "Status Updated",
+        description: `Proposal status changed to ${newStatus}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update proposal status.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDelete = (id: number) => {
-    setProposals(prev => prev.filter(proposal => proposal.id !== id));
-    toast({
-      title: "Proposal Deleted",
-      description: "The proposal has been removed.",
-    });
+  const handleDelete = async (id: number) => {
+    try {
+      const response = await fetch(`/api/proposals/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) throw new Error('Failed to delete proposal');
+      
+      await loadProposals(); // Reload proposals
+      toast({
+        title: "Proposal Deleted",
+        description: "The proposal has been removed.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete proposal.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExport = () => {
@@ -108,6 +127,16 @@ export default function AdminProposals() {
     a.click();
     window.URL.revokeObjectURL(url);
   };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -145,28 +174,28 @@ export default function AdminProposals() {
                   onClick={() => setStatusFilter("all")}
                   size="sm"
                 >
-                  All
+                  All ({proposals.length})
                 </Button>
                 <Button
                   variant={statusFilter === "pending" ? "default" : "outline"}
                   onClick={() => setStatusFilter("pending")}
                   size="sm"
                 >
-                  Pending
+                  Pending ({proposals.filter(p => p.status === "pending").length})
                 </Button>
                 <Button
                   variant={statusFilter === "reviewed" ? "default" : "outline"}
                   onClick={() => setStatusFilter("reviewed")}
                   size="sm"
                 >
-                  Reviewed
+                  Reviewed ({proposals.filter(p => p.status === "reviewed").length})
                 </Button>
                 <Button
                   variant={statusFilter === "completed" ? "default" : "outline"}
                   onClick={() => setStatusFilter("completed")}
                   size="sm"
                 >
-                  Completed
+                  Completed ({proposals.filter(p => p.status === "completed").length})
                 </Button>
               </div>
             </div>
@@ -192,10 +221,12 @@ export default function AdminProposals() {
                           <Mail className="w-4 h-4 mr-1" />
                           {proposal.email}
                         </div>
-                        <div className="flex items-center">
-                          <Phone className="w-4 h-4 mr-1" />
-                          {proposal.phone}
-                        </div>
+                        {proposal.phone && (
+                          <div className="flex items-center">
+                            <Phone className="w-4 h-4 mr-1" />
+                            {proposal.phone}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">

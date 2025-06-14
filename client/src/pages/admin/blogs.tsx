@@ -24,10 +24,27 @@ export default function AdminBlogs() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Load blogs from the centralized data
+  // Load blogs from the API
+  const loadBlogs = async () => {
+    try {
+      const blogData = await getAllBlogPosts();
+      setBlogs(blogData);
+    } catch (error) {
+      console.error('Error loading blogs:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load blog posts.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setBlogs(getAllBlogPosts());
+    loadBlogs();
   }, []);
 
   const filteredBlogs = blogs.filter(blog => {
@@ -38,26 +55,57 @@ export default function AdminBlogs() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleDelete = (id: number) => {
-    if (deleteBlogPost(id)) {
-      setBlogs(getAllBlogPosts());
+  const handleDelete = async (id: number) => {
+    try {
+      const success = await deleteBlogPost(id);
+      if (success) {
+        await loadBlogs(); // Reload the blogs
+        toast({
+          title: "Blog Post Deleted",
+          description: "The blog post has been removed.",
+        });
+      } else {
+        throw new Error("Failed to delete blog post");
+      }
+    } catch (error) {
       toast({
-        title: "Blog Post Deleted",
-        description: "The blog post has been removed.",
+        title: "Error",
+        description: "Failed to delete blog post.",
+        variant: "destructive",
       });
     }
   };
 
-  const handleStatusChange = (id: number, newStatus: "draft" | "published") => {
-    const updatedPost = updateBlogPost(id, { status: newStatus });
-    if (updatedPost) {
-      setBlogs(getAllBlogPosts());
+  const handleStatusChange = async (id: number, newStatus: "draft" | "published") => {
+    try {
+      const updatedPost = await updateBlogPost(id, { status: newStatus });
+      if (updatedPost) {
+        await loadBlogs(); // Reload the blogs
+        toast({
+          title: "Status Updated",
+          description: `Blog post status changed to ${newStatus}`,
+        });
+      } else {
+        throw new Error("Failed to update blog post");
+      }
+    } catch (error) {
       toast({
-        title: "Status Updated",
-        description: `Blog post status changed to ${newStatus}`,
+        title: "Error",
+        description: "Failed to update blog post status.",
+        variant: "destructive",
       });
     }
   };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
